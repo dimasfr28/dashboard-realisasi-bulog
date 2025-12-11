@@ -130,12 +130,12 @@ st.markdown("""
 @st.cache_data
 def load_data():
     """Load and cache the Excel data"""
-    df = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Export')
+    df = pd.read_excel('assets/data.xlsx', sheet_name='Export')
     df['Tanggal PO'] = pd.to_datetime(df['Tanggal PO'], errors='coerce')
     df['Tanggal Penerimaan'] = pd.to_datetime(df['Tanggal Penerimaan'], errors='coerce')
 
-    df_target_kanwil = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Target Kanwil')
-    df_target_kancab = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Target Kancab')
+    df_target_kanwil = pd.read_excel('assets/data.xlsx', sheet_name='Target Kanwil')
+    df_target_kancab = pd.read_excel('assets/data.xlsx', sheet_name='Target Kancab')
 
     # Clean invalid kanwil values
     invalid_kanwil_values = [
