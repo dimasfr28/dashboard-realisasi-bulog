@@ -1,0 +1,14 @@
+Saya ingin rebuild card/metric:
+1) Realisasi Setara Beras Hari Ini (End Date filter Periode): Terpengaruh dengan filter "Kanwil" dan juga "Periode". Ini mengambil In / Out di hari yang di filter. Karena filter Periode dalam yang digunakan hanya end date untuk diambil "Tanggal Penerimaan" yang hanya tanggal itu. Buat hanya untuk 
+2) Total Realisasi Setara Beras (Periode start dan date): Terpengaruh dengan filter "Kanwil" dan juga "Periode". Ini mengambil In / Out total berdasarkan filter.
+3) Taget Setara Baris (Kanwil): Ambil sheet "Target" lalu ambil "Target Setara Beras" yang kanwilnya sesuai filter Kanwil.
+4) Sisa Target Setara Beras (Kanwil) :Ambil sheet "Target" lalu ambil "Target Setara Beras" yang kanwilnya sesuai filter Kanwil. lalu dari target tersebut kurangi dengan total In/Out Setara Beras.
+
+Saya mengingatkan rumus setara beras seperti berikut:
+jika 
+a) BERAS = Ambil Komoditi yang valuenya BERAS PREMIUM+BERAS MEDIUM
+b) GKG = Ambil Komodiati yang value nya GAMBAH lalu cari spesifikasi yang valuenya mengandung "GKG" contohnya "GKG 17% / GKG 45%, dan lain lain"
+c) GKP = Ambil Komodiati yang value nya GAMBAH lalu cari spesifikasi yang valuenya mengandung "GKP" contohnya "GKP 17% / GKP 45%, dan lain lain"
+
+setara beras (d)
+d = a + 0.635 b + 0.53375 c
