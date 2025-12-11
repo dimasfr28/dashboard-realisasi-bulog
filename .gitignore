@@ -1,0 +1,26 @@
+# Streamlit secrets - DO NOT COMMIT
+.streamlit/secrets.toml
+
+# Environment files
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Excel files (optional, if you want to keep them local only)
+# assets/data.xlsx
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

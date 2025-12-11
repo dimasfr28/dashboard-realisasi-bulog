@@ -7,12 +7,6 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import numpy as np
 import gspread
-from google.oauth2 import service_account
-from dotenv import load_dotenv
-import os
-
-# Load environment variables
-load_dotenv()
 
 # Page configuration
 st.set_page_config(
@@ -138,9 +132,9 @@ st.markdown("""
 def load_data():
     """Load and cache data from Google Sheets"""
     try:
-        # Get API key and spreadsheet ID from environment
-        api_key = os.getenv('SPREADSHEET_API')
-        spreadsheet_url = os.getenv('LINK_FILE')
+        # Get API key and spreadsheet URL from Streamlit secrets
+        api_key = st.secrets["google_sheets"]["api_key"]
+        spreadsheet_url = st.secrets["google_sheets"]["spreadsheet_url"]
 
         # Extract spreadsheet ID from URL
         # Format: https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit...
@@ -227,7 +221,7 @@ def load_data():
 
     except Exception as e:
         st.error(f"Error loading data from Google Sheets: {str(e)}")
-        st.info("Please check your API key and spreadsheet URL in the .env file")
+        st.info("Please check your API key and spreadsheet URL in .streamlit/secrets.toml file")
         return pd.DataFrame(), pd.DataFrame()
 
 def calculate_setara_beras(df):
