@@ -130,12 +130,12 @@ st.markdown("""
 @st.cache_data
 def load_data():
     """Load and cache the Excel data"""
-    df = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Export')
+    df = pd.read_excel('assets/data.xlsx', sheet_name='Export')
     df['Tanggal PO'] = pd.to_datetime(df['Tanggal PO'], errors='coerce')
     df['Tanggal Penerimaan'] = pd.to_datetime(df['Tanggal Penerimaan'], errors='coerce')
 
-    df_target_kanwil = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Target Kanwil')
-    df_target_kancab = pd.read_excel('/home/dimas/bulog/dashboard-week-1/assets/data.xlsx', sheet_name='Target Kancab')
+    df_target_kanwil = pd.read_excel('assets/data.xlsx', sheet_name='Target Kanwil')
+    df_target_kancab = pd.read_excel('assets/data.xlsx', sheet_name='Target Kancab')
 
     # Clean invalid kanwil values
     invalid_kanwil_values = [
@@ -936,36 +936,36 @@ def render_kancab_table_html(df, start_date, end_date):
     for _, row in df.iterrows():
         is_total = row['Kancab'] == 'TOTAL KANWIL'
         if is_total:
-            row_style = 'background:#ffe599; font-weight:bold;'
+            row_style = 'background: #ffe599; color: black; font-weight: bold;'
         else:
             row_style = ''
 
         rows_html += f'<tr style="{row_style}">'
-        rows_html += f'<td>{row["NO"] if row["NO"] != "" else ""}</td>'
-        rows_html += f'<td style="text-align: left; padding-left: 10px;">{row["Kancab"]}</td>'
-        rows_html += f'<td>{format_value(row["Target Setara Beras"])}</td>'
-        rows_html += f'<td>{format_value(row["Beras (a)"])}</td>'
-        rows_html += f'<td>{format_value(row["GKG (b)"])}</td>'
-        rows_html += f'<td>{format_value(row["GKP (c)"])}</td>'
-        rows_html += f'<td>{format_value(row["Setara Beras (d)"])}</td>'
-        rows_html += f'<td>{format_value(row["Capaian (%)"], is_percent=True)}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{row["NO"] if row["NO"] != "" else ""}</td>'
+        rows_html += f'<td style="text-align: left; padding-left: 8px; border: 1px solid black;">{row["Kancab"]}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["Target Setara Beras"])}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["Beras (a)"])}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["GKG (b)"])}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["GKP (c)"])}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["Setara Beras (d)"])}</td>'
+        rows_html += f'<td style="border: 1px solid black;">{format_value(row["Capaian (%)"], is_percent=True)}</td>'
         rows_html += '</tr>'
 
     html = f'''
-<table border="1" cellspacing="0" cellpadding="8" style="border-collapse: collapse; font-size: 12px; text-align: center; width: 100%; font-family: Arial;">
+<table border="1" cellspacing="0" cellpadding="8" style="border-collapse: collapse; font-size: 12px; text-align: center; width: 100%; font-family: Arial; border: 1px solid black;">
     <thead>
-        <tr style="background:#1f497d; color:white; font-weight:bold;">
-            <th rowspan="2">No.</th>
-            <th rowspan="2">Kancab</th>
-            <th rowspan="2">Target Setara Beras</th>
-            <th colspan="5">Realisasi S. d. {end_date.strftime("%d %b %Y")}</th>
+        <tr style="background: rgb(31, 73, 125); color: white; font-weight: bold;">
+            <th rowspan="2" style="border: 1px solid black;">No.</th>
+            <th rowspan="2" style="border: 1px solid black;">Kancab</th>
+            <th rowspan="2" style="border: 1px solid black;">Target Setara Beras</th>
+            <th colspan="5" style="border: 1px solid black;">Realisasi S. d. {end_date.strftime("%d %b %Y")}</th>
         </tr>
-        <tr style="background:#4bacc6; color:white; font-weight:bold;">
-            <th>Beras (a)</th>
-            <th>GKG (b)</th>
-            <th>GKP (c)</th>
-            <th>Setara Beras (d)</th>
-            <th>Capaian (%)</th>
+        <tr style="background: rgb(75, 172, 198); color: white; font-weight: bold;">
+            <th style="border: 1px solid black;">Beras (a)</th>
+            <th style="border: 1px solid black;">GKG (b)</th>
+            <th style="border: 1px solid black;">GKP (c)</th>
+            <th style="border: 1px solid black;">Setara Beras (d)</th>
+            <th style="border: 1px solid black;">Capaian (%)</th>
         </tr>
     </thead>
     <tbody>

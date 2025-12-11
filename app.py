@@ -6,6 +6,13 @@ from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import numpy as np
+import gspread
+from google.oauth2 import service_account
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Page configuration
 st.set_page_config(
@@ -129,36 +136,99 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    """Load and cache the Excel data"""
-    df = pd.read_excel('assets/data.xlsx', sheet_name='Export')
-    df['Tanggal PO'] = pd.to_datetime(df['Tanggal PO'], errors='coerce')
-    df['Tanggal Penerimaan'] = pd.to_datetime(df['Tanggal Penerimaan'], errors='coerce')
+    """Load and cache data from Google Sheets"""
+    try:
+        # Get API key and spreadsheet ID from environment
+        api_key = os.getenv('SPREADSHEET_API')
+        spreadsheet_url = os.getenv('LINK_FILE')
 
-    df_target_kanwil = pd.read_excel('assets/data.xlsx', sheet_name='Target Kanwil')
-    df_target_kancab = pd.read_excel('assets/data.xlsx', sheet_name='Target Kancab')
+        # Extract spreadsheet ID from URL
+        # Format: https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit...
+        spreadsheet_id = spreadsheet_url.split('/d/')[1].split('/')[0]
 
-    # Clean invalid kanwil values
-    invalid_kanwil_values = [
-        'Total',
-        'Applied filters:',
-        'date_order_interval is on or after 01/01/2025',
-        'tgl_penerimaan is on or after 01/01/2025 and is before 09/12/2025',
-        'status_picking is done',
-        'Exported data exceeded the allowed volume. Some data may have been omitted.',
-        'p'
-    ]
+        # Create gspread client with API key
+        gc = gspread.api_key(api_key)
 
-    # Remove rows with invalid kanwil values
-    df = df[~df['kanwil'].isin(invalid_kanwil_values)]
+        # Open spreadsheet by ID
+        spreadsheet = gc.open_by_key(spreadsheet_id)
 
-    # Also remove rows where kanwil contains "Applied filters" or "Exported data" (partial match)
-    df = df[~df['kanwil'].astype(str).str.contains('Applied filters', na=False)]
-    df = df[~df['kanwil'].astype(str).str.contains('Exported data', na=False)]
-    df = df[~df['kanwil'].astype(str).str.contains('date_order_interval', na=False)]
-    df = df[~df['kanwil'].astype(str).str.contains('tgl_penerimaan', na=False)]
-    df = df[~df['kanwil'].astype(str).str.contains('status_picking', na=False)]
+        # Load main data from 'Export' sheet
+        # Use value_render_option='UNFORMATTED_VALUE' to get raw values instead of formatted strings
+        sheet_export = spreadsheet.worksheet('Export')
+        data_export = sheet_export.get_all_records(value_render_option='UNFORMATTED_VALUE')
+        df = pd.DataFrame(data_export)
 
-    return df, df_target_kanwil
+        # Convert date columns - Google Sheets dates come as serial numbers (days since 1899-12-30)
+        # Excel epoch: 1899-12-30, so we need to convert from that origin
+        def convert_gsheet_date(value):
+            """Convert Google Sheets serial date to datetime"""
+            if pd.isna(value):
+                return pd.NaT
+            try:
+                # If it's already a string in date format, parse it
+                if isinstance(value, str):
+                    return pd.to_datetime(value, errors='coerce')
+                # If it's a number (serial date), convert from Excel epoch
+                # Google Sheets uses same serial date as Excel (days since 1899-12-30)
+                return pd.to_datetime('1899-12-30') + pd.Timedelta(days=float(value))
+            except:
+                return pd.NaT
+
+        df['Tanggal PO'] = df['Tanggal PO'].apply(convert_gsheet_date)
+        df['Tanggal Penerimaan'] = df['Tanggal Penerimaan'].apply(convert_gsheet_date)
+
+        # Convert numeric columns to proper types
+        numeric_columns = ['No. ID Pemasok', 'Tahun Stok', 'Kuantum PO (Kg)', 'In / Out',
+                          'Harga Include ppn', 'Nominal Realisasi Incl ppn']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Load target data from 'Target Kanwil' sheet
+        sheet_target_kanwil = spreadsheet.worksheet('Target Kanwil')
+        data_target_kanwil = sheet_target_kanwil.get_all_records(value_render_option='UNFORMATTED_VALUE')
+        df_target_kanwil = pd.DataFrame(data_target_kanwil)
+
+        # Convert numeric columns in target tables
+        if 'Target Setara Beras' in df_target_kanwil.columns:
+            df_target_kanwil['Target Setara Beras'] = pd.to_numeric(df_target_kanwil['Target Setara Beras'], errors='coerce')
+
+        # Load target data from 'Target Kancab' sheet
+        sheet_target_kancab = spreadsheet.worksheet('Target Kancab')
+        data_target_kancab = sheet_target_kancab.get_all_records(value_render_option='UNFORMATTED_VALUE')
+        df_target_kancab = pd.DataFrame(data_target_kancab)
+
+        # Convert numeric columns in target kancab
+        if len(df_target_kancab) > 0 and 'Target Setara Beras' in df_target_kancab.columns:
+            df_target_kancab['Target Setara Beras'] = pd.to_numeric(df_target_kancab['Target Setara Beras'], errors='coerce')
+
+        # Clean invalid kanwil values
+        invalid_kanwil_values = [
+            'Total',
+            'Applied filters:',
+            'date_order_interval is on or after 01/01/2025',
+            'tgl_penerimaan is on or after 01/01/2025 and is before 09/12/2025',
+            'status_picking is done',
+            'Exported data exceeded the allowed volume. Some data may have been omitted.',
+            'p'
+        ]
+
+        # Remove rows with invalid kanwil values
+        df = df[~df['kanwil'].isin(invalid_kanwil_values)]
+
+        # Also remove rows where kanwil contains "Applied filters" or "Exported data" (partial match)
+        df = df[~df['kanwil'].astype(str).str.contains('Applied filters', na=False)]
+        df = df[~df['kanwil'].astype(str).str.contains('Exported data', na=False)]
+        df = df[~df['kanwil'].astype(str).str.contains('date_order_interval', na=False)]
+        df = df[~df['kanwil'].astype(str).str.contains('tgl_penerimaan', na=False)]
+        df = df[~df['kanwil'].astype(str).str.contains('status_picking', na=False)]
+
+        return df, df_target_kanwil
+
+    except Exception as e:
+        st.error(f"Error loading data from Google Sheets: {str(e)}")
+        st.info("Please check your API key and spreadsheet URL in the .env file")
+        return pd.DataFrame(), pd.DataFrame()
 
 def calculate_setara_beras(df):
     """
@@ -1695,7 +1765,7 @@ def main():
             h4 {
                 color: #1f497d !important;
                 }
-            .st-am{
+            div .st-am{
                 background-color: #1f497d !important;
                 }
 
