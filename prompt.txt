@@ -1,56 +1,6 @@
-Tasks:
-1)
-saya ingin mengubah Tabel Realisasi per-Kancab struktur tabelnya sebagai berikut:
-<table border="1" cellspacing="0" cellpadding="8" style="border-collapse: collapse; font-size: 12px; text-align: center; width: 100%; font-family: Arial;">
-    <thead>
-        <tr style="background:#1f497d; color:white; font-weight:bold;">
-            <th rowspan="2">No.</th>
-            <th rowspan="2">Kancab</th>
-            <th rowspan="2">Target Setara Beras</th>
-            <th colspan="5">Realisasi S. d. [Tanggal select filter]</th>
-        </tr>
-        <tr style="background:#4bacc6; color:white; font-weight:bold;">
-            <th>Beras (a)</th>
-            <th>GKG (b)</th>
-            <th>GKP (c)</th>
-            <th>Setara Beras (d)</th>
-            <th>Capaian (%)</th>
-        </tr>
-    </thead>
+saya ingin anda menambahkan 1 button yang digunakan untuk export, detailnya seperti ini:
+sheet "Visualisasi Analisa": berupa 4 matrics dan juga 2 chart, yakni Tren Realisasi Kanwil dan Realisasi 7 Hari Terakhir
+sheet "Realisasi Per-Kanwil": berupa tabel  Tabel Realisasi per-Kanwil
+dan juga sheet "Realisasi Per-Kancab" : Berupa tabel  Realisasi per-Kancab
 
-    <tbody>
-
-        <tr style="font-weight:bold; background:#ddebf7;">
-            <td>[No (dimulai dari 1)]</td>
-            <td>[df[Entitas] sesuai filter kanwil]</td>
-            <td>[df_target_kancab[Target Setara Beras] yang sama dengan nama kancab (Jika tidak ada kasih tanda "-" saja)]</td>
-            <td>[Ambil value total BERAS (BERAS MEDIUM+BERAS PREMIUM dari df["Komoditi"])]</td>
-            <td>[Ambil "Komoditi" Gabah yang "spesifikasi" nya mengandung kata GKG (contohnya "GKG 13%, GKG 17% dan lain lain") lalu total sesuai kancab]</td>
-            <td>[Ambil "Komoditi" Gabah yang "spesifikasi" nya mengandung kata GKP (contohnya "GKG 13%, GKG 17% dan lain lain") lalu total sesuai kancab]</td>
-            <td>[ambil value yang sebaris, untuk menadapatkan setara beras maka lakukan fungsi berikut d=a+0.635b+0.53375c]</td>
-            <td>[realisisasi = persentase target setara beras yang terealisasikan (d)]</td>
-        </tr>
-
-        <tr style="background:#b6d7a8; font-weight:bold;">
-            <td colspan="2">TOTAL KANWIL (filter kanwil)</td>
-             <td>[total value]</td>
-            <td>[total value]</td>
-            <td>[total value]</td>
-            <td>[total value]</td>
-            <td>[total value]</td>
-            <td>[total value]</td>
-        </tr>
-    </tbody>
-</table>
-
-saya ingin ada export excel yang hasilnya harus sama persis dengan style tabel di tampilan html
-
-
-2)
-Buatkan saya grafik batang Realisasi 7 hari terakhir. ini berdasarkan filter Kanwil
-ada 3 batang x:
-BERAS = BERAS PREMIUM+BERAS MEDIUM
-GKP = Ambil "Komoditi" Gabah yang "spesifikasi" nya adalah GKP
-GKB = Ambil "Komoditi" Gabah yang "spesifikasi" nya adalah GKB
-
-y=tanggal 7 hari terakhir
+saya ingin stylenya hasil export sama dengan html cssnya. 

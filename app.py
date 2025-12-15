@@ -490,14 +490,32 @@ def create_summary_table(df_filtered, df_target):
 #     )
 
 #     return fig
+
 def create_line_chart(df_filtered):
     """Create line chart with 3 lines (BERAS, GKP, GKG) without value labels and without markers."""
+
+    # Determine the year from the filtered data
+    if not df_filtered.empty and 'Tanggal Penerimaan' in df_filtered.columns:
+        current_year = df_filtered['Tanggal Penerimaan'].dt.year.max()
+    else:
+        current_year = datetime.now().year
+
+    # Create complete date range for all months (Jan-Dec)
+    date_range = pd.date_range(
+        start=f'{current_year}-01-01',
+        end=f'{current_year}-12-31',
+        freq='D'
+    )
+    complete_dates = pd.DataFrame({'Tanggal': date_range.date})
 
     # Filter BERAS
     df_beras = df_filtered[df_filtered['Komoditi'].isin(['BERAS MEDIUM', 'BERAS PREMIUM'])]
     daily_beras = df_beras.groupby(df_beras['Tanggal Penerimaan'].dt.date)['In / Out'].sum().reset_index()
     daily_beras.columns = ['Tanggal', 'In Out (Kg)']
     daily_beras['In Out (Ton)'] = daily_beras['In Out (Kg)'] / 1000
+    # Merge with complete dates
+    daily_beras = complete_dates.merge(daily_beras[['Tanggal', 'In Out (Ton)']], on='Tanggal', how='left')
+    daily_beras['In Out (Ton)'] = daily_beras['In Out (Ton)'].fillna(0)
     daily_beras = daily_beras.sort_values('Tanggal')
 
     # Filter GKP
@@ -508,6 +526,9 @@ def create_line_chart(df_filtered):
     daily_gkp = df_gkp.groupby(df_gkp['Tanggal Penerimaan'].dt.date)['In / Out'].sum().reset_index()
     daily_gkp.columns = ['Tanggal', 'In Out (Kg)']
     daily_gkp['In Out (Ton)'] = daily_gkp['In Out (Kg)'] / 1000
+    # Merge with complete dates
+    daily_gkp = complete_dates.merge(daily_gkp[['Tanggal', 'In Out (Ton)']], on='Tanggal', how='left')
+    daily_gkp['In Out (Ton)'] = daily_gkp['In Out (Ton)'].fillna(0)
     daily_gkp = daily_gkp.sort_values('Tanggal')
 
     # Filter GKG
@@ -518,11 +539,20 @@ def create_line_chart(df_filtered):
     daily_gkg = df_gkg.groupby(df_gkg['Tanggal Penerimaan'].dt.date)['In / Out'].sum().reset_index()
     daily_gkg.columns = ['Tanggal', 'In Out (Kg)']
     daily_gkg['In Out (Ton)'] = daily_gkg['In Out (Kg)'] / 1000
+    # Merge with complete dates
+    daily_gkg = complete_dates.merge(daily_gkg[['Tanggal', 'In Out (Ton)']], on='Tanggal', how='left')
+    daily_gkg['In Out (Ton)'] = daily_gkg['In Out (Ton)'].fillna(0)
     daily_gkg = daily_gkg.sort_values('Tanggal')
 
     # Create figure
     fig = go.Figure()
 
+
+    tick_dates = pd.date_range(
+        start=f'{current_year}-01-01',
+        end=f'{current_year}-12-01',
+        freq='MS'   # Month Start
+    )
     # BERAS (tanpa marker, tanpa text)
     fig.add_trace(go.Scatter(
         x=daily_beras['Tanggal'],
@@ -583,6 +613,13 @@ def create_line_chart(df_filtered):
             showline=True,
             linecolor='#000000',
             linewidth=2,
+
+            tickmode='array',
+            tickvals=tick_dates,
+            ticktext=[d.strftime('%b %Y') for d in tick_dates],  # <-- Jan 2025
+            tickangle=0,
+            range=[f'{current_year}-01-01', f'{current_year}-12-31'],
+
             tickfont=dict(color="#000000", size=11),
             title_font=dict(color="#000000", size=14)
         ),
@@ -602,23 +639,46 @@ def create_line_chart(df_filtered):
 
     return fig
 
-def create_bar_chart_7days(df_filtered):
+def create_bar_chart_7days(df_filtered, end_date=None):
     """
     Create bar chart for last 7 days with 3 bars: BERAS, GKP, GKB
     Based on Kanwil filter
+    Args:
+        df_filtered: DataFrame that has been filtered
+        end_date: End date from filter (if None, use max date from data)
     """
     # Get last 7 days from the filtered data
     if df_filtered.empty:
-        return go.Figure()
+        # Return empty figure with proper layout
+        fig = go.Figure()
+        fig.update_layout(
+            title=None,
+            xaxis_title='Tanggal',
+            yaxis_title='Realisasi (Ton)',
+            height=450,
+            plot_bgcolor='rgba(248, 252, 255, 0.8)',
+            paper_bgcolor='white'
+        )
+        return fig
 
-    # Get the maximum date in the filtered data
-    max_date = df_filtered['Tanggal Penerimaan'].max()
+    # Ensure Tanggal Penerimaan is datetime
+    if not pd.api.types.is_datetime64_any_dtype(df_filtered['Tanggal Penerimaan']):
+        df_filtered['Tanggal Penerimaan'] = pd.to_datetime(df_filtered['Tanggal Penerimaan'])
+
+    # Get the maximum date: use end_date from filter if provided, otherwise use max from data
+    if end_date is not None:
+        max_date = pd.Timestamp(end_date)
+    else:
+        max_date = df_filtered['Tanggal Penerimaan'].max()
 
     # Calculate 7 days ago from max date
     start_date_7days = max_date - timedelta(days=6)  # 6 days before max_date = 7 days total
 
-    # Filter data for last 7 days
-    df_7days = df_filtered[df_filtered['Tanggal Penerimaan'] >= start_date_7days].copy()
+    # Filter data for last 7 days (between start_date_7days and max_date)
+    df_7days = df_filtered[
+        (df_filtered['Tanggal Penerimaan'] >= start_date_7days) &
+        (df_filtered['Tanggal Penerimaan'] <= max_date)
+    ].copy()
 
     # Group by date for each commodity
     # BERAS = BERAS PREMIUM + BERAS MEDIUM
@@ -661,6 +721,11 @@ def create_bar_chart_7days(df_filtered):
     # Sort by date
     df_merged = df_merged.sort_values('Tanggal')
 
+    # Prepare text labels for value annotations
+    text_beras = [f'{val:,.1f}' if val > 0 else '' for val in df_merged['BERAS']]
+    text_gkp = [f'{val:,.1f}' if val > 0 else '' for val in df_merged['GKP']]
+    text_gkb = [f'{val:,.1f}' if val > 0 else '' for val in df_merged['GKB']]
+
     # Create figure
     fig = go.Figure()
 
@@ -690,6 +755,74 @@ def create_bar_chart_7days(df_filtered):
         marker=dict(color='#28a745'),
         hovertemplate='<b>GKB</b><br>Tanggal: %{x}<br>Realisasi: %{y:,.2f} Ton<br><extra></extra>'
     ))
+
+    # Add value labels with yellow background for all bars
+    # Bar positions: grouped bars use x-coordinate with offsets
+    # For barmode='group' with 3 traces, bars are positioned with spacing
+    bar_width_offset = 0.27  # Offset for grouped bars
+
+    # BERAS annotations (first bar in each group, leftmost)
+    for idx, (date, value, text) in enumerate(zip(df_merged['Tanggal'], df_merged['BERAS'], text_beras)):
+        if text:  # Only add annotation if value > 0
+            fig.add_annotation(
+                x=idx - bar_width_offset,  # Left position in group
+                y=value,
+                text=text,
+                showarrow=False,
+                yanchor='bottom',
+                yshift=5,  # 5px above bar
+                bgcolor='#FFD700',  # Yellow background (gold)
+                bordercolor='#000000',
+                borderwidth=1,
+                borderpad=3,
+                font=dict(
+                    size=9,
+                    color='#000000',
+                    family='Arial'
+                )
+            )
+
+    # GKP annotations (second bar in each group, middle)
+    for idx, (date, value, text) in enumerate(zip(df_merged['Tanggal'], df_merged['GKP'], text_gkp)):
+        if text:
+            fig.add_annotation(
+                x=idx,  # Center position in group
+                y=value,
+                text=text,
+                showarrow=False,
+                yanchor='bottom',
+                yshift=5,
+                bgcolor='#FFD700',
+                bordercolor='#000000',
+                borderwidth=1,
+                borderpad=3,
+                font=dict(
+                    size=9,
+                    color='#000000',
+                    family='Arial'
+                )
+            )
+
+    # GKB annotations (third bar in each group, rightmost)
+    for idx, (date, value, text) in enumerate(zip(df_merged['Tanggal'], df_merged['GKB'], text_gkb)):
+        if text:
+            fig.add_annotation(
+                x=idx + bar_width_offset,  # Right position in group
+                y=value,
+                text=text,
+                showarrow=False,
+                yanchor='bottom',
+                yshift=5,
+                bgcolor='#FFD700',
+                bordercolor='#000000',
+                borderwidth=1,
+                borderpad=3,
+                font=dict(
+                    size=9,
+                    color='#000000',
+                    family='Arial'
+                )
+            )
 
     # Update layout
     fig.update_layout(
@@ -730,7 +863,7 @@ def create_bar_chart_7days(df_filtered):
             tickfont=dict(color="#000000", size=11),
             title_font=dict(color="#000000", size=14)
         ),
-        margin=dict(t=40, b=60, l=60, r=40)
+        margin=dict(t=60, b=60, l=60, r=40)  # Increased top margin from 40 to 60 for value labels
     )
 
     return fig
@@ -1811,7 +1944,8 @@ def main():
             "Pilih Akun Analitik:",
             options=all_akun_analitik,
             default=["PSO"],     # default hanya PSO
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="filter_akun_analitik"
         )
 
     # Filter 2: Kanwil (untuk Line Chart & Tabel Kancab)
@@ -1823,7 +1957,8 @@ def main():
             "Pilih Kanwil:",
             options=all_kanwil,
             default=["11001 - KANTOR WILAYAH JATENG"],
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="filter_kanwil"
         )
 
     # Filter 3: Date Range (UNTUK SEMUA VISUALISASI)
@@ -1831,14 +1966,16 @@ def main():
         st.markdown("#### Periode")
 
         min_date_penerimaan = df['Tanggal Penerimaan'].min().date() if pd.notna(df['Tanggal Penerimaan'].min()) else datetime(2025, 1, 1).date()
-        max_date_penerimaan = df['Tanggal Penerimaan'].max().date() if pd.notna(df['Tanggal Penerimaan'].max()) else datetime.now().date()
+        # max_date_penerimaan = df['Tanggal Penerimaan'].max().date() if pd.notna(df['Tanggal Penerimaan'].max()) else datetime.now().date()
+        max_date_penerimaan = datetime.now().date()
 
         date_range = st.date_input(
             "Range Tanggal Penerimaan:",
             value=(min_date_penerimaan, max_date_penerimaan),
             min_value=min_date_penerimaan,
             max_value=max_date_penerimaan,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="filter_date_range"
         )
 
     # Apply filters for general data
@@ -1849,14 +1986,20 @@ def main():
         df_filtered = df_filtered[df_filtered['Akun Analitik'].isin(selected_akun_analitik)]
 
     # Filter 2: Periode (berpengaruh pada SEMUA visualisasi)
-    if len(date_range) == 2:
+    # Handle date_range properly
+    if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         df_filtered = df_filtered[
             (df_filtered['Tanggal Penerimaan'].dt.date >= start_date) &
             (df_filtered['Tanggal Penerimaan'].dt.date <= end_date)
         ]
+    elif isinstance(date_range, tuple) and len(date_range) == 1:
+        start_date = end_date = date_range[0]
+        df_filtered = df_filtered[df_filtered['Tanggal Penerimaan'].dt.date == start_date]
     else:
+        # Single date selected
         start_date = end_date = date_range
+        df_filtered = df_filtered[df_filtered['Tanggal Penerimaan'].dt.date == start_date]
 
     # Filter for LINE CHART & TABEL KANCAB (tambahan filter Kanwil)
     df_chart = df_filtered.copy()
@@ -1962,26 +2105,34 @@ def main():
     else:
         st.warning("⚠️ Tidak ada data untuk ditampilkan")
 
-    linech, barch= st.columns(2)
+    linech, barch = st.columns([2, 1])
     # ===== LINE CHART =====
     with linech:
         st.markdown('<div class="chart-title">📈 Tren Realisasi Kanwil</div>', unsafe_allow_html=True)
 
-        if not df_chart.empty:
-            fig = create_line_chart(df_chart)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter yang dipilih")
+        try:
+            if not df_chart.empty:
+                fig = create_line_chart(df_chart)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter yang dipilih")
+        except Exception as e:
+            st.error(f"⚠️ Error saat membuat line chart: {str(e)}")
+            st.info("Silakan selesaikan pemilihan filter untuk melihat chart")
 
     with barch:
         # ===== BAR CHART 7 HARI TERAKHIR =====
         st.markdown('<div class="chart-title">📊 Realisasi 7 Hari Terakhir</div>', unsafe_allow_html=True)
 
-        if not df_chart.empty:
-            fig_bar = create_bar_chart_7days(df_chart)
-            st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter yang dipilih")
+        try:
+            if not df_chart.empty:
+                fig_bar = create_bar_chart_7days(df_chart, end_date)
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter yang dipilih")
+        except Exception as e:
+            st.error(f"⚠️ Error saat membuat bar chart: {str(e)}")
+            st.info("Silakan selesaikan pemilihan filter untuk melihat chart")
 
     # ===== TABEL REALISASI DETAIL PER-KANCAB =====
     st.markdown('<div class="chart-title">📊 Tabel Realisasi per-Kancab</div>', unsafe_allow_html=True)
