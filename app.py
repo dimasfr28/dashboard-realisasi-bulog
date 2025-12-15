@@ -217,12 +217,12 @@ def load_data():
         df = df[~df['kanwil'].astype(str).str.contains('tgl_penerimaan', na=False)]
         df = df[~df['kanwil'].astype(str).str.contains('status_picking', na=False)]
 
-        return df, df_target_kanwil
+        return df, df_target_kanwil, df_target_kancab
 
     except Exception as e:
         st.error(f"Error loading data from Google Sheets: {str(e)}")
         st.info("Please check your API key and spreadsheet URL in .streamlit/secrets.toml file")
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def calculate_setara_beras(df):
     """
@@ -1884,7 +1884,7 @@ def main():
     """, unsafe_allow_html=True)
 
     # Load data
-    df, df_target = load_data()
+    df, df_target_kanwil, df_target_kancab = load_data()
 
     colA, colB, colC = st.columns(3)
     st.markdown("""
@@ -2047,12 +2047,12 @@ def main():
     with col3:
         # Ambil target dari sheet "Target" berdasarkan filter Kanwil
         if selected_kanwil:
-            target_setara_beras = df_target[
-                df_target['kanwil'].isin(selected_kanwil)
+            target_setara_beras = df_target_kanwil[
+                df_target_kanwil['kanwil'].isin(selected_kanwil)
             ]['Target Setara Beras'].sum()
         else:
             # Jika tidak ada kanwil yang dipilih, gunakan semua kanwil
-            target_setara_beras = df_target['Target Setara Beras'].sum()
+            target_setara_beras = df_target_kanwil['Target Setara Beras'].sum()
 
         st.metric(f"🎯 Target {selected_kanwil}", f"{target_setara_beras:,.2f} Ton")
 
@@ -2078,7 +2078,7 @@ def main():
 
     if not df_summary.empty:
         # Create summary table data (df_summary is already filtered by Akun Analitik and Periode)
-        data_sentra, data_lainnya = create_summary_table(df_summary, df_target)
+        data_sentra, data_lainnya = create_summary_table(df_summary, df_target_kanwil)
 
         # Render HTML table
         html_summary, total_sentra, total_lainnya, total_seindo, capaian_sentra, capaian_lainnya, capaian_seindo = render_summary_table_html(
@@ -2139,7 +2139,7 @@ def main():
 
     if not df_kancab.empty:
         # Create Kancab table (df_kancab is already filtered by Akun Analitik, Periode, and Kanwil)
-        kancab_df = create_kancab_table(df_kancab, df_target)
+        kancab_df = create_kancab_table(df_kancab, df_target_kancab)
         excel_kancab = create_kancab_excel_export(kancab_df, end_date)
         st.download_button(
                 label="📥 Download Tabel Realisasi Kancab (Excel)",
