@@ -342,17 +342,27 @@ def create_summary_table(df_filtered, df_target):
 
     # Build data for Kanwil Sentra Produksi
     data_sentra = []
-    for idx, kanwil in enumerate(kanwil_sentra, 1):
+    for kanwil in kanwil_sentra:
         row_data = get_kanwil_data(kanwil)
-        row_data['No'] = idx
         data_sentra.append(row_data)
+
+    # Sort by Capaian (%) descending
+    data_sentra = sorted(data_sentra, key=lambda x: x['Capaian (%)'], reverse=True)
+    # Re-assign No after sorting
+    for idx, row in enumerate(data_sentra, 1):
+        row['No'] = idx
 
     # Build data for Kanwil Lainnya
     data_lainnya = []
-    for idx, kanwil in enumerate(kanwil_lainnya, 1):
+    for kanwil in kanwil_lainnya:
         row_data = get_kanwil_data(kanwil)
-        row_data['No'] = idx
         data_lainnya.append(row_data)
+
+    # Sort by Capaian (%) descending
+    data_lainnya = sorted(data_lainnya, key=lambda x: x['Capaian (%)'], reverse=True)
+    # Re-assign No after sorting
+    for idx, row in enumerate(data_lainnya, 1):
+        row['No'] = idx
 
     return data_sentra, data_lainnya
 
@@ -1110,9 +1120,13 @@ def create_kancab_table(df_filtered, df_target):
 
     result_df = pd.DataFrame(result_data)
 
-    # Sort by Setara Beras descending
+    # Sort by Capaian (%) descending, then by Setara Beras descending for ties
     if not result_df.empty:
-        result_df = result_df.sort_values('Setara Beras (d)', ascending=False).reset_index(drop=True)
+        # Fill NaN in Capaian with -1 so they appear at the bottom when sorted
+        result_df['Capaian (%)'] = result_df['Capaian (%)'].fillna(-1)
+        result_df = result_df.sort_values(['Capaian (%)', 'Setara Beras (d)'], ascending=[False, False]).reset_index(drop=True)
+        # Replace -1 back to None for display
+        result_df['Capaian (%)'] = result_df['Capaian (%)'].replace(-1, None)
         # Add NO column
         result_df.insert(0, 'NO', range(1, len(result_df) + 1))
 
