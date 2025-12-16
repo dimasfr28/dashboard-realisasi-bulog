@@ -1,5 +1,5 @@
 # Streamlit secrets - DO NOT COMMIT
-.streamlit/secrets.toml
+.streamlit/*
 
 # Environment files
 .env
