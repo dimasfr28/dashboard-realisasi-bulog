@@ -1,6 +1,1 @@
-saya ingin anda menambahkan 1 button yang digunakan untuk export, detailnya seperti ini:
-sheet "Visualisasi Analisa": berupa 4 matrics dan juga 2 chart, yakni Tren Realisasi Kanwil dan Realisasi 7 Hari Terakhir
-sheet "Realisasi Per-Kanwil": berupa tabel  Tabel Realisasi per-Kanwil
-dan juga sheet "Realisasi Per-Kancab" : Berupa tabel  Realisasi per-Kancab
-
-saya ingin stylenya hasil export sama dengan html cssnya. 
+Sya ingin line chart ini bersifat dinamis. jadi bukan tampil bulan januari-desember saja tetapi tergantung filter Periode tanggal. jadi contohnya yang dipilih adalah 2025/01/06 – 2025/12/16 maka yang ditampilkan adalah x label Jan 2025-Des 2025 dan jika 2025/03/04 – 2025/11/16 maka yang ditampilkan adalah x label Mar 2025-Nov 2025 jika 2025/01/06 - 2026/01/06 maka yang ditampilkan adalah x label Jan 2025-Jan 2026

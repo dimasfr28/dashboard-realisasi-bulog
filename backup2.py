@@ -128,7 +128,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data
 def load_data():
     """Load and cache data from Google Sheets"""
     try:
@@ -217,12 +217,12 @@ def load_data():
         df = df[~df['kanwil'].astype(str).str.contains('tgl_penerimaan', na=False)]
         df = df[~df['kanwil'].astype(str).str.contains('status_picking', na=False)]
 
-        return df, df_target_kanwil, df_target_kancab
+        return df, df_target_kanwil
 
     except Exception as e:
         st.error(f"Error loading data from Google Sheets: {str(e)}")
         st.info("Please check your API key and spreadsheet URL in .streamlit/secrets.toml file")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
 def calculate_setara_beras(df):
     """
@@ -491,36 +491,19 @@ def create_summary_table(df_filtered, df_target):
 
 #     return fig
 
-def create_line_chart(df_filtered, start_date=None, end_date=None):
-    """Create line chart with 3 lines (BERAS, GKP, GKG) without value labels and without markers.
+def create_line_chart(df_filtered):
+    """Create line chart with 3 lines (BERAS, GKP, GKG) without value labels and without markers."""
 
-    Args:
-        df_filtered: Filtered dataframe
-        start_date: Start date of the period (datetime.date or string)
-        end_date: End date of the period (datetime.date or string)
-    """
-
-    # Determine date range from parameters or data
-    if start_date is not None and end_date is not None:
-        # Convert to datetime if string
-        if isinstance(start_date, str):
-            start_date = pd.to_datetime(start_date).date()
-        if isinstance(end_date, str):
-            end_date = pd.to_datetime(end_date).date()
-    elif not df_filtered.empty and 'Tanggal Penerimaan' in df_filtered.columns:
-        # Use data range from filtered data
-        start_date = df_filtered['Tanggal Penerimaan'].min().date()
-        end_date = df_filtered['Tanggal Penerimaan'].max().date()
+    # Determine the year from the filtered data
+    if not df_filtered.empty and 'Tanggal Penerimaan' in df_filtered.columns:
+        current_year = df_filtered['Tanggal Penerimaan'].dt.year.max()
     else:
-        # Fallback to current year
         current_year = datetime.now().year
-        start_date = datetime(current_year, 1, 1).date()
-        end_date = datetime(current_year, 12, 31).date()
 
-    # Create complete date range based on selected period
+    # Create complete date range for all months (Jan-Dec)
     date_range = pd.date_range(
-        start=start_date,
-        end=end_date,
+        start=f'{current_year}-01-01',
+        end=f'{current_year}-12-31',
         freq='D'
     )
     complete_dates = pd.DataFrame({'Tanggal': date_range.date})
@@ -564,13 +547,10 @@ def create_line_chart(df_filtered, start_date=None, end_date=None):
     # Create figure
     fig = go.Figure()
 
-    # Generate tick dates dynamically based on the period
-    # Start from the first day of start_date's month, end at first day of end_date's month
-    tick_start = pd.Timestamp(start_date).replace(day=1)
-    tick_end = pd.Timestamp(end_date).replace(day=1)
+
     tick_dates = pd.date_range(
-        start=tick_start,
-        end=tick_end,
+        start=f'{current_year}-01-01',
+        end=f'{current_year}-12-01',
         freq='MS'   # Month Start
     )
     # BERAS (tanpa marker, tanpa text)
@@ -636,9 +616,9 @@ def create_line_chart(df_filtered, start_date=None, end_date=None):
 
             tickmode='array',
             tickvals=tick_dates,
-            ticktext=[d.strftime('%b %Y') for d in tick_dates],  # Dynamic: Jan 2025, Feb 2025, etc.
+            ticktext=[d.strftime('%b %Y') for d in tick_dates],  # <-- Jan 2025
             tickangle=0,
-            range=[start_date, end_date],  # Dynamic range based on selected period
+            range=[f'{current_year}-01-01', f'{current_year}-12-31'],
 
             tickfont=dict(color="#000000", size=11),
             title_font=dict(color="#000000", size=14)
@@ -1070,20 +1050,11 @@ def create_kancab_table(df_filtered, df_target):
         setara_beras = beras + (0.635 * gkg) + (0.53375 * gkp)
 
         # Get Target from df_target (if exists)
-        # Match kancab name from df_filtered['Entitas'] with df_target['kancab']
+        # Try to find target for this kancab - assuming df_target might have kancab/entitas column
         target_setara_beras = None
-        if 'kancab' in df_target.columns and 'Target Setara Beras' in df_target.columns:
-            # Try exact match first
-            target_row = df_target[df_target['kancab'] == kancab]
-
-            # If no exact match, try case-insensitive match with trimmed whitespace
-            if len(target_row) == 0:
-                kancab_normalized = str(kancab).strip().upper()
-                df_target_normalized = df_target.copy()
-                df_target_normalized['kancab_norm'] = df_target_normalized['kancab'].astype(str).str.strip().str.upper()
-                target_row = df_target_normalized[df_target_normalized['kancab_norm'] == kancab_normalized]
-
-            if len(target_row) > 0:
+        if 'Entitas' in df_target.columns:
+            target_row = df_target[df_target['Entitas'] == kancab]
+            if len(target_row) > 0 and 'Target Setara Beras' in df_target.columns:
                 target_setara_beras = target_row['Target Setara Beras'].values[0]
 
         # If no target found, set to None (will show as "-")
@@ -1912,9 +1883,8 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # Load data with spinner
-    with st.spinner('Memuat data dari Google Sheets...'):
-        df, df_target_kanwil, df_target_kancab = load_data()
+    # Load data
+    df, df_target = load_data()
 
     colA, colB, colC = st.columns(3)
     st.markdown("""
@@ -1986,7 +1956,7 @@ def main():
         selected_kanwil = st.multiselect(
             "Pilih Kanwil:",
             options=all_kanwil,
-            default=["13001 - KANTOR WILAYAH JATIM"],
+            default=["11001 - KANTOR WILAYAH JATENG"],
             label_visibility="collapsed",
             key="filter_kanwil"
         )
@@ -2077,12 +2047,12 @@ def main():
     with col3:
         # Ambil target dari sheet "Target" berdasarkan filter Kanwil
         if selected_kanwil:
-            target_setara_beras = df_target_kanwil[
-                df_target_kanwil['kanwil'].isin(selected_kanwil)
+            target_setara_beras = df_target[
+                df_target['kanwil'].isin(selected_kanwil)
             ]['Target Setara Beras'].sum()
         else:
             # Jika tidak ada kanwil yang dipilih, gunakan semua kanwil
-            target_setara_beras = df_target_kanwil['Target Setara Beras'].sum()
+            target_setara_beras = df_target['Target Setara Beras'].sum()
 
         st.metric(f"🎯 Target {selected_kanwil}", f"{target_setara_beras:,.2f} Ton")
 
@@ -2108,7 +2078,7 @@ def main():
 
     if not df_summary.empty:
         # Create summary table data (df_summary is already filtered by Akun Analitik and Periode)
-        data_sentra, data_lainnya = create_summary_table(df_summary, df_target_kanwil)
+        data_sentra, data_lainnya = create_summary_table(df_summary, df_target)
 
         # Render HTML table
         html_summary, total_sentra, total_lainnya, total_seindo, capaian_sentra, capaian_lainnya, capaian_seindo = render_summary_table_html(
@@ -2142,7 +2112,7 @@ def main():
 
         try:
             if not df_chart.empty:
-                fig = create_line_chart(df_chart, start_date, end_date)
+                fig = create_line_chart(df_chart)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("⚠️ Tidak ada data untuk ditampilkan dengan filter yang dipilih")
@@ -2169,7 +2139,7 @@ def main():
 
     if not df_kancab.empty:
         # Create Kancab table (df_kancab is already filtered by Akun Analitik, Periode, and Kanwil)
-        kancab_df = create_kancab_table(df_kancab, df_target_kancab)
+        kancab_df = create_kancab_table(df_kancab, df_target)
         excel_kancab = create_kancab_excel_export(kancab_df, end_date)
         st.download_button(
                 label="📥 Download Tabel Realisasi Kancab (Excel)",
