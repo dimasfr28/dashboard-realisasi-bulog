@@ -1,5 +1,7 @@
 # Streamlit secrets - DO NOT COMMIT
-.streamlit/*
+.streamlit/secrets.toml
+# Allow example file to be committed
+!.streamlit/secrets.toml.example
 
 # Environment files
 .env
