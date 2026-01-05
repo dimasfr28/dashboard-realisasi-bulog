@@ -2324,37 +2324,45 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
         hovertemplate='<b>GKG</b><br>Tanggal: %{x|%d %b %Y}<br>Realisasi: %{y:,.2f} Ton<extra></extra>'
     ))
 
-    # Add BERAS line trace (overlay) - bersentuhan dengan bar
+    # Filter data untuk line trace - hanya tampilkan jika value > 0
+    df_beras_line = df_beras[df_beras['beras'] > 0].copy()
+    df_gkp_line = df_gkp[df_gkp['gkp'] > 0].copy()
+    df_gkg_line = df_gkg[df_gkg['gkg'] > 0].copy()
+
+    # Add BERAS line trace (overlay) - hanya tampil jika value > 0
     fig.add_trace(go.Scatter(
-        x=df_beras['tanggal'],
-        y=df_beras['beras'],
+        x=df_beras_line['tanggal'],
+        y=df_beras_line['beras'],
         mode='lines',
         name='BERAS Trend',
         line=dict(color='#1f497d', width=3, shape='linear'),
         showlegend=False,
-        hoverinfo='skip'
+        hoverinfo='skip',
+        connectgaps=False  # Jangan hubungkan gap (value 0)
     ))
 
-    # Add GKP line trace (overlay) - bersentuhan dengan bar
+    # Add GKP line trace (overlay) - hanya tampil jika value > 0
     fig.add_trace(go.Scatter(
-        x=df_gkp['tanggal'],
-        y=df_gkp['gkp'],
+        x=df_gkp_line['tanggal'],
+        y=df_gkp_line['gkp'],
         mode='lines',
         name='GKP Trend',
         line=dict(color='#4bacc6', width=3, shape='linear'),
         showlegend=False,
-        hoverinfo='skip'
+        hoverinfo='skip',
+        connectgaps=False  # Jangan hubungkan gap (value 0)
     ))
 
-    # Add GKG line trace (overlay) - bersentuhan dengan bar
+    # Add GKG line trace (overlay) - hanya tampil jika value > 0
     fig.add_trace(go.Scatter(
-        x=df_gkg['tanggal'],
-        y=df_gkg['gkg'],
+        x=df_gkg_line['tanggal'],
+        y=df_gkg_line['gkg'],
         mode='lines',
         name='GKG Trend',
         line=dict(color='#9dc3e6', width=3, shape='linear'),
         showlegend=False,
-        hoverinfo='skip'
+        hoverinfo='skip',
+        connectgaps=False  # Jangan hubungkan gap (value 0)
     ))
 
     # Update layout - Light theme
@@ -2379,7 +2387,8 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
             bordercolor='#1f497d',
             borderwidth=1
         ),
-        margin=dict(l=50, r=50, t=50, b=50)
+        margin=dict(l=50, r=50, t=50, b=50),
+        dragmode='pan'  # Default cursor mode adalah Pan (geser/drag)
     )
 
     # Update axes - dengan tick labels berwarna dark
@@ -2502,7 +2511,8 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, 
             bordercolor='#1f497d',
             borderwidth=1
         ),
-        margin=dict(l=50, r=50, t=50, b=50)
+        margin=dict(l=50, r=50, t=50, b=50),
+        dragmode='pan'  # Default cursor mode adalah Pan (geser/drag)
     )
 
     # Update axes - dengan tick labels berwarna dark
@@ -3990,71 +4000,13 @@ def main():
                     st.info(f"ℹ️ Menggunakan data dari cache: **{len(df_new):,}** records dari sheet **'{selected_sheet}'**")
 
                 # Show preview
-                st.markdown('<p style="color: #1f497d; font-weight: 600; margin-bottom: 0;">👁️ Preview Data Baru (5 baris pertama)</p>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #1f497d; font-weight: 600; margin-bottom: 0;">👁️ Preview Data Baru</p>', unsafe_allow_html=True)
                 with st.expander("", expanded=False):
-                    st.dataframe(df_new.head(), use_container_width=True)
+                    st.dataframe(df_new.head(15), use_container_width=True)
 
                 # Initialize log container in session state
                 if 'process_logs' not in st.session_state:
                     st.session_state.process_logs = []
-
-                # Display persistent log area at the top
-                st.markdown("---")
-                st.markdown('<h4 style="color: #1f497d;">📋 Process Log (Persisten - Tidak akan hilang sampai refresh halaman)</h4>', unsafe_allow_html=True)
-
-                st.markdown("""
-                <style>
-                .log-container {
-                    background-color: #1e1e1e;
-                    color: #d4d4d4;
-                    padding: 15px;
-                    border-radius: 5px;
-                    font-family: 'Courier New', monospace;
-                    font-size: 12px;
-                    max-height: 500px;
-                    overflow-y: auto;
-                    border: 2px solid #4a4a4a;
-                }
-                .log-entry {
-                    margin-bottom: 5px;
-                    line-height: 1.6;
-                }
-                .log-time {
-                    color: #569cd6;
-                    font-weight: bold;
-                }
-                .log-info { color: #d4d4d4; }
-                .log-success { color: #4ec9b0; }
-                .log-warning { color: #ffd700; }
-                .log-error { color: #f48771; }
-                </style>
-                """, unsafe_allow_html=True)
-
-                # Create placeholder for logs (will be updated dynamically)
-                if 'log_placeholder' not in st.session_state:
-                    st.session_state.log_placeholder = st.empty()
-
-                # Display logs
-                with st.session_state.log_placeholder.container():
-                    if st.session_state.process_logs:
-                        # Display logs in a scrollable area
-                        log_html = '<div class="log-container">'
-                        for log in st.session_state.process_logs:
-                            # Color class based on level
-                            level_class = f'log-{log["level"]}'
-                            log_html += f'<div class="log-entry"><span class="log-time">[{log["timestamp"]}]</span> <span class="{level_class}">{log["message"]}</span></div>'
-                        log_html += '</div>'
-                        st.markdown(log_html, unsafe_allow_html=True)
-                    else:
-                        st.info("📝 Log akan muncul di sini saat proses berjalan...")
-
-                # Add button to clear logs
-                col_clear1, col_clear2 = st.columns([3, 1])
-                with col_clear2:
-                    if st.session_state.process_logs:
-                        if st.button("🗑️ Clear Logs", key="clear_logs_button", use_container_width=True):
-                            st.session_state.process_logs = []
-                            st.rerun()
 
                 # Mode selection
                 st.markdown('<h4 style="color: #1f497d;">⚙️ Mode Upload</h4>', unsafe_allow_html=True)
