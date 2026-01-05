@@ -1,8 +1,6 @@
 # Streamlit secrets - DO NOT COMMIT
 .streamlit/secrets.toml
 .streamlit/bulog-storage-dd243eff2107.json
-# Allow example file to be committed
-!.streamlit/secrets.toml.example
 
 # Environment files
 .env
