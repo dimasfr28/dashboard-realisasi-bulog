@@ -2558,13 +2558,13 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
         linecolor='#1f497d',
         title_font=dict(color='#1f497d'),
         tickfont=dict(color='#1f497d', size=10),  # Tick labels berwarna dark
-        range=[0, 5000]  # Set y-axis range maksimal 5000 (5k)
+        range=[0, 15000]  # Set y-axis range maksimal 5000 (5k)
     )
 
     # Add annotations dengan background color untuk label value
     annotations = []
 
-    # Untuk BERAS
+    # Untuk BERAS (bar paling kiri dalam group)
     for i, row in df_beras.iterrows():
         if row['beras'] > 0:  # Hanya tampilkan jika value > 0
             annotations.append(dict(
@@ -2572,9 +2572,9 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
                 y=row['beras'],
                 text=f"{row['beras']:,.0f}",
                 showarrow=False,
-                xshift=0,
+                xshift=-20,  # Geser ke kiri (bar pertama)
                 yshift=15,
-                font=dict(size=12, color='white'),
+                font=dict(size=8, color='white'),
                 bgcolor='#1f497d',
                 borderpad=3,
                 bordercolor='#1f497d',
@@ -2582,7 +2582,7 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
                 opacity=0.9
             ))
 
-    # Untuk GKP
+    # Untuk GKP (bar tengah dalam group)
     for i, row in df_gkp.iterrows():
         if row['gkp'] > 0:  # Hanya tampilkan jika value > 0
             annotations.append(dict(
@@ -2590,9 +2590,9 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
                 y=row['gkp'],
                 text=f"{row['gkp']:,.0f}",
                 showarrow=False,
-                xshift=0,
+                xshift=0,  # Tetap di tengah
                 yshift=15,
-                font=dict(size=12, color='white'),
+                font=dict(size=8, color='white'),
                 bgcolor='#4bacc6',
                 borderpad=3,
                 bordercolor='#4bacc6',
@@ -2600,7 +2600,7 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
                 opacity=0.9
             ))
 
-    # Untuk GKG
+    # Untuk GKG (bar paling kanan dalam group)
     for i, row in df_gkg.iterrows():
         if row['gkg'] > 0:  # Hanya tampilkan jika value > 0
             annotations.append(dict(
@@ -2608,9 +2608,9 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date
                 y=row['gkg'],
                 text=f"{row['gkg']:,.0f}",
                 showarrow=False,
-                xshift=0,
+                xshift=20,  # Geser ke kanan (bar ketiga)
                 yshift=15,
-                font=dict(size=12, color='white'),
+                font=dict(size=8, color='white'),
                 bgcolor='#9dc3e6',
                 borderpad=3,
                 bordercolor='#9dc3e6',
