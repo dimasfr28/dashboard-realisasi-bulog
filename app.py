@@ -2333,9 +2333,14 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
     fig.add_trace(go.Scatter(
         x=df_beras_line['tanggal'],
         y=df_beras_line['beras'],
-        mode='lines',
+        mode='lines+text',
         name='BERAS Trend',
         line=dict(color='#1f497d', width=3, shape='linear'),
+        text=[f'{val:,.0f}' for val in df_beras_line['beras']],
+        textposition='top center',
+        texttemplate='<br><br><br><br><br><br>%{text}',
+        textfont=dict(size=9, color='#1f497d'),
+        cliponaxis=False,
         showlegend=False,
         hoverinfo='skip',
         connectgaps=False  # Jangan hubungkan gap (value 0)
@@ -2345,9 +2350,14 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
     fig.add_trace(go.Scatter(
         x=df_gkp_line['tanggal'],
         y=df_gkp_line['gkp'],
-        mode='lines',
+        mode='lines+text',
         name='GKP Trend',
         line=dict(color='#4bacc6', width=3, shape='linear'),
+        text=[f'{val:,.0f}' for val in df_gkp_line['gkp']],
+        textposition='top center',
+        texttemplate='<br><br><br><br><br><br>%{text}',
+        textfont=dict(size=9, color='#4bacc6'),
+        cliponaxis=False,
         showlegend=False,
         hoverinfo='skip',
         connectgaps=False  # Jangan hubungkan gap (value 0)
@@ -2357,9 +2367,14 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
     fig.add_trace(go.Scatter(
         x=df_gkg_line['tanggal'],
         y=df_gkg_line['gkg'],
-        mode='lines',
+        mode='lines+text',
         name='GKG Trend',
         line=dict(color='#9dc3e6', width=3, shape='linear'),
+        text=[f'{val:,.0f}' for val in df_gkg_line['gkg']],
+        textposition='top center',
+        texttemplate='<br><br><br><br><br><br>%{text}',
+        textfont=dict(size=9, color='#9dc3e6'),
+        cliponaxis=False,
         showlegend=False,
         hoverinfo='skip',
         connectgaps=False  # Jangan hubungkan gap (value 0)
@@ -2392,6 +2407,9 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
     )
 
     # Update axes - dengan tick labels berwarna dark
+    # Set initial view ke 30 hari terakhir
+    last_30_days_start = end_date - pd.Timedelta(days=29)  # 29 hari + hari ini = 30 hari
+
     fig.update_xaxes(
         showgrid=True,
         gridwidth=1,
@@ -2400,7 +2418,10 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
         linewidth=1,
         linecolor='#1f497d',
         title_font=dict(color='#1f497d'),
-        tickfont=dict(color='#1f497d', size=10)  # Tick labels berwarna dark
+        tickfont=dict(color='#1f497d', size=10),  # Tick labels berwarna dark
+        range=[last_30_days_start, end_date],  # Set initial view ke 30 hari terakhir
+        tickformat='%d %b %y',  # Format: 15 Des 25, 6 Nov 26, dst
+        dtick=2*86400000.0  # Interval 1 hari (dalam milliseconds)
     )
 
     fig.update_yaxes(
@@ -2416,33 +2437,28 @@ def create_line_chart_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_e
 
     return fig
 
-def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, end_date):
+def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_end_date, start_date, end_date):
     """
-    Create bar chart 7 hari terakhir menggunakan data dari RPC
+    Create bar chart menggunakan data dari RPC
+    Menampilkan 7 hari terakhir sebagai initial view, tetapi bisa digeser untuk melihat data lainnya
 
     Parameters:
     - p_nama_kanwil: Value filter Kanwil
     - p_akun_analitik: Value filter akun analitik
+    - p_start_date: value start date filter periode (string)
     - p_end_date: value end date filter periode (string)
+    - start_date: Start date object for display
     - end_date: End date object for display
 
     Returns:
     Plotly figure object
     """
-    # Hitung 7 hari ke belakang terlebih dahulu
-    if isinstance(end_date, str):
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
-    else:
-        end_date_obj = end_date
+    # Ambil data dari RPC - ambil semua data dari periode yang dipilih
+    df = get_tren_realisasi_kanwil(p_nama_kanwil, p_akun_analitik, p_start_date, p_end_date)
 
-    start_date_7days = end_date_obj - timedelta(days=6)
-
-    # Create complete date range untuk 7 hari (selalu ada, bahkan jika data kosong)
-    date_range = pd.date_range(start=start_date_7days, end=end_date_obj, freq='D')
+    # Create complete date range untuk seluruh periode
+    date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     complete_dates = pd.DataFrame({'tanggal': date_range})
-
-    # Ambil data dari RPC
-    df = get_realisasi_7_hari_terakhir(p_nama_kanwil, p_akun_analitik, p_end_date)
 
     # Jika ada data, convert tanggal dan merge
     if not df.empty:
@@ -2516,6 +2532,9 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, 
     )
 
     # Update axes - dengan tick labels berwarna dark
+    # Set initial view ke 7 hari terakhir
+    last_7_days_start = end_date - pd.Timedelta(days=6)  # 6 hari + hari ini = 7 hari
+
     fig.update_xaxes(
         showgrid=True,
         gridwidth=1,
@@ -2523,10 +2542,11 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, 
         showline=True,
         linewidth=1,
         linecolor='#1f497d',
-        tickformat='%d-%m-%Y',  # Format: 29-12-2025
+        tickformat='%d %b %y',  # Format: 15 Des 25, 6 Nov 26, dst
         title_font=dict(color='#1f497d'),
         tickfont=dict(color='#1f497d', size=10),  # Tick labels berwarna dark
-        tickangle=-45  # Miringkan label agar tidak overlap
+        range=[last_7_days_start, end_date],  # Set initial view ke 7 hari terakhir
+        dtick=86400000.0  # Interval 1 hari (dalam milliseconds)
     )
 
     fig.update_yaxes(
@@ -2537,8 +2557,68 @@ def create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, 
         linewidth=1,
         linecolor='#1f497d',
         title_font=dict(color='#1f497d'),
-        tickfont=dict(color='#1f497d', size=10)  # Tick labels berwarna dark
+        tickfont=dict(color='#1f497d', size=10),  # Tick labels berwarna dark
+        range=[0, 5000]  # Set y-axis range maksimal 5000 (5k)
     )
+
+    # Add annotations dengan background color untuk label value
+    annotations = []
+
+    # Untuk BERAS
+    for i, row in df_beras.iterrows():
+        if row['beras'] > 0:  # Hanya tampilkan jika value > 0
+            annotations.append(dict(
+                x=row['tanggal'],
+                y=row['beras'],
+                text=f"{row['beras']:,.0f}",
+                showarrow=False,
+                xshift=0,
+                yshift=15,
+                font=dict(size=12, color='white'),
+                bgcolor='#1f497d',
+                borderpad=3,
+                bordercolor='#1f497d',
+                borderwidth=1,
+                opacity=0.9
+            ))
+
+    # Untuk GKP
+    for i, row in df_gkp.iterrows():
+        if row['gkp'] > 0:  # Hanya tampilkan jika value > 0
+            annotations.append(dict(
+                x=row['tanggal'],
+                y=row['gkp'],
+                text=f"{row['gkp']:,.0f}",
+                showarrow=False,
+                xshift=0,
+                yshift=15,
+                font=dict(size=12, color='white'),
+                bgcolor='#4bacc6',
+                borderpad=3,
+                bordercolor='#4bacc6',
+                borderwidth=1,
+                opacity=0.9
+            ))
+
+    # Untuk GKG
+    for i, row in df_gkg.iterrows():
+        if row['gkg'] > 0:  # Hanya tampilkan jika value > 0
+            annotations.append(dict(
+                x=row['tanggal'],
+                y=row['gkg'],
+                text=f"{row['gkg']:,.0f}",
+                showarrow=False,
+                xshift=0,
+                yshift=15,
+                font=dict(size=12, color='white'),
+                bgcolor='#9dc3e6',
+                borderpad=3,
+                bordercolor='#9dc3e6',
+                borderwidth=1,
+                opacity=0.9
+            ))
+
+    fig.update_layout(annotations=annotations)
 
     return fig
 
@@ -4690,7 +4770,7 @@ def main():
         st.markdown('<div class="chart-title">📊 Realisasi 7 Hari Terakhir</div>', unsafe_allow_html=True)
 
         try:
-            fig_bar = create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_end_date, end_date)
+            fig_bar = create_bar_chart_7days_from_rpc(p_nama_kanwil, p_akun_analitik, p_start_date, p_end_date, start_date, end_date)
             # Konfigurasi untuk memastikan tema light
             config_bar = {
                 'displayModeBar': True,
