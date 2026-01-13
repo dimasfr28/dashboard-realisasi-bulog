@@ -4505,7 +4505,7 @@ def main():
     with colA:
         st.markdown("#### Akun Analitik")
         # Daftar akun analitik (hardcoded, bisa diambil dari database jika diperlukan)
-        all_akun_analitik = ["CBP", "PSO"]
+        all_akun_analitik = ["Komersil", "PSO"]
 
         selected_akun_analitik = st.multiselect(
             "Pilih Akun Analitik:",
