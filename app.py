@@ -212,6 +212,35 @@ def convert_to_date(value):
     except:
         return None
 
+def normalize_to_first_of_month(date_value):
+    """
+    Normalize any date to the 1st day of the same month.
+    Input dapat berupa string (MM/DD/YYYY atau YYYY-MM-DD) atau datetime object.
+    Output: date object dengan tanggal 1 pada bulan yang sama.
+
+    Examples:
+        1/30/2025 -> 2025-01-01
+        2/28/2025 -> 2025-02-01
+        3/15/2025 -> 2025-03-01
+    """
+    if pd.isna(date_value) or date_value is None:
+        return None
+
+    try:
+        # Parse date dari berbagai format
+        if isinstance(date_value, str):
+            # Coba parse sebagai MM/DD/YYYY atau format lain
+            dt = pd.to_datetime(date_value)
+        else:
+            # Sudah datetime object
+            dt = date_value
+
+        # Normalisasi ke tanggal 1 pada bulan yang sama
+        normalized_date = dt.replace(day=1).date()
+        return normalized_date
+    except:
+        return None
+
 def prepare_realisasi_for_db(df, kanwil_map, kancab_map):
     """Prepare dataframe realisasi untuk insert ke database"""
     data_to_insert = []
@@ -257,9 +286,23 @@ def prepare_realisasi_for_db(df, kanwil_map, kancab_map):
 
     return data_to_insert
 
-def prepare_target_kanwil_for_db(df, kanwil_map):
-    """Prepare dataframe target_kanwil untuk insert ke database"""
+def prepare_target_kanwil_for_db(df, kanwil_map, target_date=None):
+    """
+    Prepare dataframe target_kanwil untuk insert ke database.
+
+    Args:
+        df: DataFrame dengan data target kanwil
+        kanwil_map: Mapping nama kanwil ke kanwil_id
+        target_date: Tanggal target (akan dinormalisasi ke tanggal 1 pada bulan yang sama)
+                     Jika None, gunakan tanggal sekarang
+    """
     data_to_insert = []
+
+    # Normalisasi tanggal target
+    if target_date is None:
+        normalized_date = normalize_to_first_of_month(datetime.now())
+    else:
+        normalized_date = normalize_to_first_of_month(target_date)
 
     for idx, row in df.iterrows():
         kanwil_name = clean_value(row.get('kanwil'))
@@ -269,15 +312,29 @@ def prepare_target_kanwil_for_db(df, kanwil_map):
         record = {
             "kanwil_id": kanwil_map[kanwil_name],
             "target_setara_beras": clean_value(row.get('Target Setara Beras')),
-            "date": datetime.now().date().isoformat()
+            "date": normalized_date.isoformat() if normalized_date else datetime.now().date().isoformat()
         }
         data_to_insert.append(record)
 
     return data_to_insert
 
-def prepare_target_kancab_for_db(df, kancab_map):
-    """Prepare dataframe target_kancab untuk insert ke database"""
+def prepare_target_kancab_for_db(df, kancab_map, target_date=None):
+    """
+    Prepare dataframe target_kancab untuk insert ke database.
+
+    Args:
+        df: DataFrame dengan data target kancab
+        kancab_map: Mapping nama kancab ke kancab_id
+        target_date: Tanggal target (akan dinormalisasi ke tanggal 1 pada bulan yang sama)
+                     Jika None, gunakan tanggal sekarang
+    """
     data_to_insert = []
+
+    # Normalisasi tanggal target
+    if target_date is None:
+        normalized_date = normalize_to_first_of_month(datetime.now())
+    else:
+        normalized_date = normalize_to_first_of_month(target_date)
 
     for idx, row in df.iterrows():
         kancab_name = clean_value(row.get('kancab'))
@@ -287,7 +344,7 @@ def prepare_target_kancab_for_db(df, kancab_map):
         record = {
             "kancab_id": kancab_map[kancab_name],
             "target_setara_beras": clean_value(row.get('Target Setara Beras')),
-            "date": datetime.now().date().isoformat()
+            "date": normalized_date.isoformat() if normalized_date else datetime.now().date().isoformat()
         }
         data_to_insert.append(record)
 
@@ -1092,8 +1149,12 @@ def migrate_from_compare_to_realisasi_streamlit(supabase, comparison_results):
 # ===== FUNGSI ALGORITMA UNTUK TARGET_KANWIL =====
 
 def generate_target_kanwil_hash(record):
-    """Generate SHA256 hash from target_kanwil record data for duplicate detection."""
+    """
+    Generate SHA256 hash from target_kanwil record data for duplicate detection.
+    Hash now includes date + kanwil_id for comparison logic.
+    """
     hash_data = {
+        'date': record.get('date'),
         'kanwil_id': record.get('kanwil_id'),
         'target_setara_beras': record.get('target_setara_beras'),
     }
@@ -1101,13 +1162,27 @@ def generate_target_kanwil_hash(record):
     return hashlib.sha256(json_string.encode()).hexdigest()
 
 
-def migrate_to_target_kanwil_compare_streamlit(supabase, df, kanwil_mapping):
+def migrate_to_target_kanwil_compare_streamlit(supabase, df, kanwil_mapping, target_date=None):
     """
     Migrate data from DataFrame to target_kanwil_compare table (Streamlit version).
+
+    Args:
+        supabase: Supabase client
+        df: DataFrame dengan data target kanwil (harus memiliki kolom 'Tanggal Target')
+        kanwil_mapping: Mapping nama kanwil ke kanwil_id
+        target_date: DEPRECATED - akan dibaca dari kolom 'Tanggal Target' di Excel
+
     Returns: total_inserted, skipped_kanwil
     """
     add_log("📥 Starting Migration to target_kanwil_compare...", "info")
     st.info("📥 Starting Migration to target_kanwil_compare...")
+
+    # Check if 'Tanggal Target' column exists
+    if 'Tanggal Target' not in df.columns:
+        error_msg = "❌ Kolom 'Tanggal Target' tidak ditemukan di Excel. Pastikan Excel memiliki kolom 'Tanggal Target' dengan format MM/DD/YYYY."
+        add_log(error_msg, "error")
+        st.error(error_msg)
+        return 0, 0
 
     # Clear table first
     add_log("🗑️ Clearing target_kanwil_compare table...", "warning")
@@ -1138,14 +1213,20 @@ def migrate_to_target_kanwil_compare_streamlit(supabase, df, kanwil_mapping):
                 skipped_kanwil += 1
                 continue
 
-            # Use current date for database (but not for hash comparison)
-            import datetime
-            target_date = datetime.datetime.now().date()
+            # Read and normalize Tanggal Target from Excel
+            tanggal_target_raw = row.get('Tanggal Target')
+            if pd.notna(tanggal_target_raw):
+                normalized_date = normalize_to_first_of_month(tanggal_target_raw)
+            else:
+                # If Tanggal Target is empty, skip this row
+                add_log(f"⚠️ Row {idx}: Tanggal Target is empty, skipping", "warning")
+                skipped_kanwil += 1
+                continue
 
             record = {
                 'kanwil_id': kanwil_id,
                 'target_setara_beras': str(row['Target Setara Beras']) if pd.notna(row.get('Target Setara Beras')) else None,
-                'date': target_date.isoformat(),
+                'date': normalized_date.isoformat() if normalized_date else None,
             }
 
             record['row_hash'] = generate_target_kanwil_hash(record)
@@ -1182,13 +1263,27 @@ def migrate_to_target_kanwil_compare_streamlit(supabase, df, kanwil_mapping):
     return total_inserted, skipped_kanwil
 
 
-def migrate_to_target_kanwil_direct_streamlit(supabase, df, kanwil_mapping):
+def migrate_to_target_kanwil_direct_streamlit(supabase, df, kanwil_mapping, target_date=None):
     """
     Migrate data from DataFrame directly to target_kanwil table (REPLACE MODE - Streamlit version).
+
+    Args:
+        supabase: Supabase client
+        df: DataFrame dengan data target kanwil (harus memiliki kolom 'Tanggal Target')
+        kanwil_mapping: Mapping nama kanwil ke kanwil_id
+        target_date: DEPRECATED - akan dibaca dari kolom 'Tanggal Target' di Excel
+
     Returns: total_inserted, skipped_kanwil
     """
     add_log("📥 Starting Direct Migration to target_kanwil (REPLACE MODE)...", "warning")
     st.warning("📥 Starting Direct Migration to target_kanwil (REPLACE MODE)...")
+
+    # Check if 'Tanggal Target' column exists
+    if 'Tanggal Target' not in df.columns:
+        error_msg = "❌ Kolom 'Tanggal Target' tidak ditemukan di Excel. Pastikan Excel memiliki kolom 'Tanggal Target' dengan format MM/DD/YYYY."
+        add_log(error_msg, "error")
+        st.error(error_msg)
+        return 0, 0
 
     # Reset target_kanwil table
     add_log("🗑️ Resetting target_kanwil table and sequence...", "warning")
@@ -1218,14 +1313,20 @@ def migrate_to_target_kanwil_direct_streamlit(supabase, df, kanwil_mapping):
                 skipped_kanwil += 1
                 continue
 
-            # Use current date for database
-            import datetime
-            target_date = datetime.datetime.now().date()
+            # Read and normalize Tanggal Target from Excel
+            tanggal_target_raw = row.get('Tanggal Target')
+            if pd.notna(tanggal_target_raw):
+                normalized_date = normalize_to_first_of_month(tanggal_target_raw)
+            else:
+                # If Tanggal Target is empty, skip this row
+                add_log(f"⚠️ Row {idx}: Tanggal Target is empty, skipping", "warning")
+                skipped_kanwil += 1
+                continue
 
             record = {
                 'kanwil_id': kanwil_id,
                 'target_setara_beras': str(row['Target Setara Beras']) if pd.notna(row.get('Target Setara Beras')) else None,
-                'date': target_date.isoformat(),
+                'date': normalized_date.isoformat() if normalized_date else None,
             }
 
             target_kanwil_data.append(record)
@@ -1264,8 +1365,12 @@ def migrate_to_target_kanwil_direct_streamlit(supabase, df, kanwil_mapping):
 # ===== FUNGSI ALGORITMA UNTUK TARGET_KANCAB =====
 
 def generate_target_kancab_hash(record):
-    """Generate SHA256 hash from target_kancab record data for duplicate detection."""
+    """
+    Generate SHA256 hash from target_kancab record data for duplicate detection.
+    Hash now includes date + kancab_id for comparison logic.
+    """
     hash_data = {
+        'date': record.get('date'),
         'kancab_id': record.get('kancab_id'),
         'target_setara_beras': record.get('target_setara_beras'),
     }
@@ -1273,13 +1378,27 @@ def generate_target_kancab_hash(record):
     return hashlib.sha256(json_string.encode()).hexdigest()
 
 
-def migrate_to_target_kancab_compare_streamlit(supabase, df, kancab_mapping):
+def migrate_to_target_kancab_compare_streamlit(supabase, df, kancab_mapping, target_date=None):
     """
     Migrate data from DataFrame to target_kancab_compare table (Streamlit version).
+
+    Args:
+        supabase: Supabase client
+        df: DataFrame dengan data target kancab (harus memiliki kolom 'Tanggal Target')
+        kancab_mapping: Mapping nama kancab ke kancab_id
+        target_date: DEPRECATED - akan dibaca dari kolom 'Tanggal Target' di Excel
+
     Returns: total_inserted, skipped_kancab
     """
     add_log("📥 Starting Migration to target_kancab_compare...", "info")
     st.info("📥 Starting Migration to target_kancab_compare...")
+
+    # Check if 'Tanggal Target' column exists
+    if 'Tanggal Target' not in df.columns:
+        error_msg = "❌ Kolom 'Tanggal Target' tidak ditemukan di Excel. Pastikan Excel memiliki kolom 'Tanggal Target' dengan format MM/DD/YYYY."
+        add_log(error_msg, "error")
+        st.error(error_msg)
+        return 0, 0
 
     # Clear table first
     add_log("🗑️ Clearing target_kancab_compare table...", "warning")
@@ -1310,14 +1429,20 @@ def migrate_to_target_kancab_compare_streamlit(supabase, df, kancab_mapping):
                 skipped_kancab += 1
                 continue
 
-            # Use current date for database (but not for hash comparison)
-            import datetime
-            target_date = datetime.datetime.now().date()
+            # Read and normalize Tanggal Target from Excel
+            tanggal_target_raw = row.get('Tanggal Target')
+            if pd.notna(tanggal_target_raw):
+                normalized_date = normalize_to_first_of_month(tanggal_target_raw)
+            else:
+                # If Tanggal Target is empty, skip this row
+                add_log(f"⚠️ Row {idx}: Tanggal Target is empty, skipping", "warning")
+                skipped_kancab += 1
+                continue
 
             record = {
                 'kancab_id': kancab_id,
                 'target_setara_beras': str(row['Target Setara Beras']) if pd.notna(row.get('Target Setara Beras')) else None,
-                'date': target_date.isoformat(),
+                'date': normalized_date.isoformat() if normalized_date else None,
             }
 
             record['row_hash'] = generate_target_kancab_hash(record)
@@ -1354,13 +1479,27 @@ def migrate_to_target_kancab_compare_streamlit(supabase, df, kancab_mapping):
     return total_inserted, skipped_kancab
 
 
-def migrate_to_target_kancab_direct_streamlit(supabase, df, kancab_mapping):
+def migrate_to_target_kancab_direct_streamlit(supabase, df, kancab_mapping, target_date=None):
     """
     Migrate data from DataFrame directly to target_kancab table (REPLACE MODE - Streamlit version).
+
+    Args:
+        supabase: Supabase client
+        df: DataFrame dengan data target kancab (harus memiliki kolom 'Tanggal Target')
+        kancab_mapping: Mapping nama kancab ke kancab_id
+        target_date: DEPRECATED - akan dibaca dari kolom 'Tanggal Target' di Excel
+
     Returns: total_inserted, skipped_kancab
     """
     add_log("📥 Starting Direct Migration to target_kancab (REPLACE MODE)...", "warning")
     st.warning("📥 Starting Direct Migration to target_kancab (REPLACE MODE)...")
+
+    # Check if 'Tanggal Target' column exists
+    if 'Tanggal Target' not in df.columns:
+        error_msg = "❌ Kolom 'Tanggal Target' tidak ditemukan di Excel. Pastikan Excel memiliki kolom 'Tanggal Target' dengan format MM/DD/YYYY."
+        add_log(error_msg, "error")
+        st.error(error_msg)
+        return 0, 0
 
     # Reset target_kancab table
     add_log("🗑️ Resetting target_kancab table and sequence...", "warning")
@@ -1390,14 +1529,20 @@ def migrate_to_target_kancab_direct_streamlit(supabase, df, kancab_mapping):
                 skipped_kancab += 1
                 continue
 
-            # Use current date for database
-            import datetime
-            target_date = datetime.datetime.now().date()
+            # Read and normalize Tanggal Target from Excel
+            tanggal_target_raw = row.get('Tanggal Target')
+            if pd.notna(tanggal_target_raw):
+                normalized_date = normalize_to_first_of_month(tanggal_target_raw)
+            else:
+                # If Tanggal Target is empty, skip this row
+                add_log(f"⚠️ Row {idx}: Tanggal Target is empty, skipping", "warning")
+                skipped_kancab += 1
+                continue
 
             record = {
                 'kancab_id': kancab_id,
                 'target_setara_beras': str(row['Target Setara Beras']) if pd.notna(row.get('Target Setara Beras')) else None,
-                'date': target_date.isoformat(),
+                'date': normalized_date.isoformat() if normalized_date else None,
             }
 
             target_kancab_data.append(record)
@@ -1608,6 +1753,78 @@ def migrate_from_target_kanwil_compare_to_target_kanwil_streamlit(supabase, comp
     return migrated_count
 
 
+def upsert_target_kanwil_from_compare_streamlit(supabase):
+    """
+    UPSERT data dari target_kanwil_compare ke target_kanwil menggunakan RPC.
+    - Jika kombinasi (date, kanwil_id) sudah ada: UPDATE target_setara_beras
+    - Jika belum ada: INSERT record baru
+    Returns: (inserted_count, updated_count)
+    """
+    add_log("🔄 Step 3: Starting UPSERT process for target_kanwil...", "info")
+    st.info("🔄 Step 3: Upserting data to target_kanwil (INSERT new / UPDATE existing)...")
+
+    # Get all IDs from compare table
+    try:
+        result = supabase.table("target_kanwil_compare").select("id").execute()
+        all_ids = [row['id'] for row in result.data]
+        total_records = len(all_ids)
+        add_log(f"📊 Total records in target_kanwil_compare: {total_records:,}", "info")
+        st.info(f"📊 Total records to process: **{total_records:,}**")
+    except Exception as e:
+        add_log(f"❌ Error getting IDs from compare table: {e}", "error")
+        st.error(f"❌ Error getting IDs from compare table: {e}")
+        return 0, 0
+
+    if not all_ids:
+        add_log("ℹ️ No data to upsert", "info")
+        st.info("ℹ️ No data to upsert")
+        return 0, 0
+
+    # Process in batches
+    batch_size = 1000
+    total_inserted = 0
+    total_updated = 0
+    total_batches = (len(all_ids) + batch_size - 1) // batch_size
+
+    progress_bar = st.progress(0, "Upserting data...")
+
+    for i in range(0, len(all_ids), batch_size):
+        batch_ids = all_ids[i:i + batch_size]
+        batch_num = i // batch_size + 1
+
+        try:
+            # Call RPC upsert function
+            result = supabase.rpc(
+                "upsert_target_kanwil_from_compare",
+                {"p_compare_ids": batch_ids}
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                inserted = result.data[0]['inserted_count']
+                updated = result.data[0]['updated_count']
+                total_inserted += inserted
+                total_updated += updated
+
+                progress = ((i + len(batch_ids)) / len(all_ids)) * 100
+                add_log(f"✅ Upsert batch {batch_num}/{total_batches}: +{inserted} inserted, ~{updated} updated - Total: {total_inserted:,}I / {total_updated:,}U ({progress:.1f}%)", "success")
+                progress_bar.progress(int(progress) / 100, f"Progress: {i + len(batch_ids):,}/{len(all_ids):,} ({progress:.1f}%)")
+
+            time.sleep(0.2)
+
+        except Exception as e:
+            add_log(f"❌ Error on batch {batch_num}: {e}", "error")
+            st.error(f"❌ Error on batch {batch_num}: {e}")
+            continue
+
+    progress_bar.progress(100, "✅ Upsert completed")
+    progress_bar.empty()
+
+    add_log(f"📊 Upsert Complete - Inserted: {total_inserted:,}, Updated: {total_updated:,}", "success")
+    st.success(f"✅ Upsert Complete - **{total_inserted:,}** new records inserted, **{total_updated:,}** existing records updated")
+
+    return total_inserted, total_updated
+
+
 # ===== RPC COMPARISON FUNCTIONS FOR TARGET_KANCAB =====
 
 def fetch_with_retry_target_kancab_streamlit(supabase, last_id, limit, max_retries=3, retry_delay=2, retries=0):
@@ -1781,6 +1998,78 @@ def migrate_from_target_kancab_compare_to_target_kancab_streamlit(supabase, comp
     st.success(f"✅ Successfully migrated **{migrated_count:,}** records to target_kancab")
 
     return migrated_count
+
+
+def upsert_target_kancab_from_compare_streamlit(supabase):
+    """
+    UPSERT data dari target_kancab_compare ke target_kancab menggunakan RPC.
+    - Jika kombinasi (date, kancab_id) sudah ada: UPDATE target_setara_beras
+    - Jika belum ada: INSERT record baru
+    Returns: (inserted_count, updated_count)
+    """
+    add_log("🔄 Step 3: Starting UPSERT process for target_kancab...", "info")
+    st.info("🔄 Step 3: Upserting data to target_kancab (INSERT new / UPDATE existing)...")
+
+    # Get all IDs from compare table
+    try:
+        result = supabase.table("target_kancab_compare").select("id").execute()
+        all_ids = [row['id'] for row in result.data]
+        total_records = len(all_ids)
+        add_log(f"📊 Total records in target_kancab_compare: {total_records:,}", "info")
+        st.info(f"📊 Total records to process: **{total_records:,}**")
+    except Exception as e:
+        add_log(f"❌ Error getting IDs from compare table: {e}", "error")
+        st.error(f"❌ Error getting IDs from compare table: {e}")
+        return 0, 0
+
+    if not all_ids:
+        add_log("ℹ️ No data to upsert", "info")
+        st.info("ℹ️ No data to upsert")
+        return 0, 0
+
+    # Process in batches
+    batch_size = 1000
+    total_inserted = 0
+    total_updated = 0
+    total_batches = (len(all_ids) + batch_size - 1) // batch_size
+
+    progress_bar = st.progress(0, "Upserting data...")
+
+    for i in range(0, len(all_ids), batch_size):
+        batch_ids = all_ids[i:i + batch_size]
+        batch_num = i // batch_size + 1
+
+        try:
+            # Call RPC upsert function
+            result = supabase.rpc(
+                "upsert_target_kancab_from_compare",
+                {"p_compare_ids": batch_ids}
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                inserted = result.data[0]['inserted_count']
+                updated = result.data[0]['updated_count']
+                total_inserted += inserted
+                total_updated += updated
+
+                progress = ((i + len(batch_ids)) / len(all_ids)) * 100
+                add_log(f"✅ Upsert batch {batch_num}/{total_batches}: +{inserted} inserted, ~{updated} updated - Total: {total_inserted:,}I / {total_updated:,}U ({progress:.1f}%)", "success")
+                progress_bar.progress(int(progress) / 100, f"Progress: {i + len(batch_ids):,}/{len(all_ids):,} ({progress:.1f}%)")
+
+            time.sleep(0.2)
+
+        except Exception as e:
+            add_log(f"❌ Error on batch {batch_num}: {e}", "error")
+            st.error(f"❌ Error on batch {batch_num}: {e}")
+            continue
+
+    progress_bar.progress(100, "✅ Upsert completed")
+    progress_bar.empty()
+
+    add_log(f"📊 Upsert Complete - Inserted: {total_inserted:,}, Updated: {total_updated:,}", "success")
+    st.success(f"✅ Upsert Complete - **{total_inserted:,}** new records inserted, **{total_updated:,}** existing records updated")
+
+    return total_inserted, total_updated
 
 
 # ===== FUNGSI RPC SUPABASE =====
@@ -4096,6 +4385,7 @@ def main():
                     help="Append: Tambahkan hanya data unik ke database | Replace: Hapus semua data lama dan ganti dengan data baru",
                     horizontal=True
                 )
+
                 if upload_mode == "🔄 Append (Tambahkan data baru)":
                     st.info("""
                     **Mode Append:**
@@ -4211,45 +4501,32 @@ def main():
                                 supabase, df_new, kanwil_map
                             )
 
-                            # Step 2: Compare using RPC
-                            comparison_results = process_comparison_target_kanwil_with_rpc_streamlit(supabase)
+                            # Step 2: UPSERT from compare table to main table
+                            # NEW: Uses upsert logic (INSERT new / UPDATE existing based on date + kanwil_id)
+                            num_inserted, num_updated = upsert_target_kanwil_from_compare_streamlit(supabase)
 
-                            # Step 3: Migrate unique data to target_kanwil
-                            if comparison_results:
-                                num_unique = migrate_from_target_kanwil_compare_to_target_kanwil_streamlit(supabase, comparison_results)
+                            # Step 3: Cleanup target_kanwil_compare
+                            add_log("🗑️ Step 3: Cleaning up target_kanwil_compare...", "info")
+                            st.info("🗑️ Step 3: Cleaning up target_kanwil_compare...")
+                            try:
+                                truncate_table_with_reset(supabase, "target_kanwil_compare")
+                                st.success("✅ target_kanwil_compare table cleaned up")
+                            except Exception as e:
+                                add_log(f"⚠️ Error cleaning up target_kanwil_compare: {e}", "warning")
+                                st.warning(f"⚠️ Error cleaning up target_kanwil_compare: {e}")
 
-                                # Step 4: Cleanup target_kanwil_compare
-                                add_log("🗑️ Step 4: Cleaning up target_kanwil_compare...", "info")
-                                st.info("🗑️ Step 4: Cleaning up target_kanwil_compare...")
-                                try:
-                                    truncate_table_with_reset(supabase, "target_kanwil_compare")
-                                    st.success("✅ target_kanwil_compare table cleaned up")
-                                except Exception as e:
-                                    add_log(f"⚠️ Error cleaning up target_kanwil_compare: {e}", "warning")
-                                    st.warning(f"⚠️ Error cleaning up target_kanwil_compare: {e}")
+                            # Set values for display
+                            unique_data = []
+                            num_unique = num_inserted + num_updated  # Total processed
 
-                                # Set unique_data for display (empty since we already migrated)
-                                unique_data = []
-                                num_duplicates = len(df_new) - len(comparison_results)
-
-                                # Log final summary
-                                add_log("="*60, "success")
-                                add_log(f"✅ APPEND PROCESS COMPLETED!", "success")
-                                add_log(f"📊 Total Excel records: {len(df_new):,}", "info")
-                                add_log(f"✅ Unique records added: {num_unique:,}", "success")
-                                add_log(f"⚠️ Duplicate records skipped: {num_duplicates:,}", "warning")
-                                add_log("="*60, "success")
-                            else:
-                                st.info("✅ No unique data to migrate")
-                                num_unique = 0
-                                num_duplicates = len(df_new)
-                                unique_data = []
-
-                                # Log final summary
-                                add_log("="*60, "info")
-                                add_log(f"ℹ️ APPEND PROCESS COMPLETED - No new data", "info")
-                                add_log(f"📊 All {len(df_new):,} records already exist in database", "info")
-                                add_log("="*60, "info")
+                            # Log final summary
+                            add_log("="*60, "success")
+                            add_log(f"✅ APPEND PROCESS COMPLETED!", "success")
+                            add_log(f"📊 Total Excel records: {len(df_new):,}", "info")
+                            add_log(f"➕ New records inserted: {num_inserted:,}", "success")
+                            add_log(f"🔄 Existing records updated: {num_updated:,}", "success")
+                            add_log(f"📊 Total records processed: {num_unique:,}", "info")
+                            add_log("="*60, "success")
 
                         else:  # target_kancab
                             # Step 1: Migrate to target_kancab_compare
@@ -4259,68 +4536,79 @@ def main():
                                 supabase, df_new, kancab_map
                             )
 
-                            # Step 2: Compare using RPC
-                            comparison_results = process_comparison_target_kancab_with_rpc_streamlit(supabase)
+                            # Step 2: UPSERT from compare table to main table
+                            # NEW: Uses upsert logic (INSERT new / UPDATE existing based on date + kancab_id)
+                            num_inserted, num_updated = upsert_target_kancab_from_compare_streamlit(supabase)
 
-                            # Step 3: Migrate unique data to target_kancab
-                            if comparison_results:
-                                num_unique = migrate_from_target_kancab_compare_to_target_kancab_streamlit(supabase, comparison_results)
+                            # Step 3: Cleanup target_kancab_compare
+                            add_log("🗑️ Step 3: Cleaning up target_kancab_compare...", "info")
+                            st.info("🗑️ Step 3: Cleaning up target_kancab_compare...")
+                            try:
+                                truncate_table_with_reset(supabase, "target_kancab_compare")
+                                st.success("✅ target_kancab_compare table cleaned up")
+                            except Exception as e:
+                                add_log(f"⚠️ Error cleaning up target_kancab_compare: {e}", "warning")
+                                st.warning(f"⚠️ Error cleaning up target_kancab_compare: {e}")
 
-                                # Step 4: Cleanup target_kancab_compare
-                                add_log("🗑️ Step 4: Cleaning up target_kancab_compare...", "info")
-                                st.info("🗑️ Step 4: Cleaning up target_kancab_compare...")
-                                try:
-                                    truncate_table_with_reset(supabase, "target_kancab_compare")
-                                    st.success("✅ target_kancab_compare table cleaned up")
-                                except Exception as e:
-                                    add_log(f"⚠️ Error cleaning up target_kancab_compare: {e}", "warning")
-                                    st.warning(f"⚠️ Error cleaning up target_kancab_compare: {e}")
+                            # Set values for display
+                            unique_data = []
+                            num_unique = num_inserted + num_updated  # Total processed
 
-                                # Set unique_data for display (empty since we already migrated)
-                                unique_data = []
-                                num_duplicates = len(df_new) - len(comparison_results)
-
-                                # Log final summary
-                                add_log("="*60, "success")
-                                add_log(f"✅ APPEND PROCESS COMPLETED!", "success")
-                                add_log(f"📊 Total Excel records: {len(df_new):,}", "info")
-                                add_log(f"✅ Unique records added: {num_unique:,}", "success")
-                                add_log(f"⚠️ Duplicate records skipped: {num_duplicates:,}", "warning")
-                                add_log("="*60, "success")
-                            else:
-                                st.info("✅ No unique data to migrate")
-                                num_unique = 0
-                                num_duplicates = len(df_new)
-                                unique_data = []
-
-                                # Log final summary
-                                add_log("="*60, "info")
-                                add_log(f"ℹ️ APPEND PROCESS COMPLETED - No new data", "info")
-                                add_log(f"📊 All {len(df_new):,} records already exist in database", "info")
-                                add_log("="*60, "info")
+                            # Log final summary
+                            add_log("="*60, "success")
+                            add_log(f"✅ APPEND PROCESS COMPLETED!", "success")
+                            add_log(f"📊 Total Excel records: {len(df_new):,}", "info")
+                            add_log(f"➕ New records inserted: {num_inserted:,}", "success")
+                            add_log(f"🔄 Existing records updated: {num_updated:,}", "success")
+                            add_log(f"📊 Total records processed: {num_unique:,}", "info")
+                            add_log("="*60, "success")
 
                     # Show metrics for all tables
                     st.markdown("---")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("📊 Total Data Baru", f"{len(df_new):,}")
-                    with col2:
-                        st.metric("✅ Data Unik", f"{num_unique:,}")
-                    with col3:
-                        st.metric("⚠️ Data Duplikat", f"{num_duplicates:,}")
 
-                    if num_unique > 0:
-                        # For all tables using NEW ALGORITHM, show summary (already migrated)
-                        st.success(f"""
-                        ✅ **Append berhasil!**
-                        - Tabel: **{selected_table}**
-                        - Data berhasil ditambahkan: **{num_unique:,}** records
-                        - Data duplikat (diabaikan): **{num_duplicates:,}** records
-                        """)
-                        st.balloons()
-                        st.info("🔄 Refresh halaman untuk melihat data terbaru")
+                    # Different display for target tables (with upsert) vs realisasi
+                    if table_name in ["target_kanwil", "target_kancab"]:
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("📊 Total Data dari Excel", f"{len(df_new):,}")
+                        with col2:
+                            st.metric("➕ Data Baru (Inserted)", f"{num_inserted:,}")
+                        with col3:
+                            st.metric("🔄 Data Diperbarui (Updated)", f"{num_updated:,}")
+
+                        if num_unique > 0:
+                            st.success(f"""
+                            ✅ **Append berhasil!**
+                            - Tabel: **{selected_table}**
+                            - Data baru ditambahkan: **{num_inserted:,}** records
+                            - Data existing diperbarui: **{num_updated:,}** records
+                            - Total diproses: **{num_unique:,}** records
+                            """)
+                            st.balloons()
+                            st.info("🔄 Refresh halaman untuk melihat data terbaru")
+                        else:
+                            st.warning("⚠️ Tidak ada data untuk diproses.")
                     else:
-                        st.warning("⚠️ Tidak ada data unik untuk ditambahkan.")
+                        # For realisasi table
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("📊 Total Data Baru", f"{len(df_new):,}")
+                        with col2:
+                            st.metric("✅ Data Unik", f"{num_unique:,}")
+                        with col3:
+                            st.metric("⚠️ Data Duplikat", f"{num_duplicates:,}")
+
+                        if num_unique > 0:
+                            st.success(f"""
+                            ✅ **Append berhasil!**
+                            - Tabel: **{selected_table}**
+                            - Data berhasil ditambahkan: **{num_unique:,}** records
+                            - Data duplikat (diabaikan): **{num_duplicates:,}** records
+                            """)
+                            st.balloons()
+                            st.info("🔄 Refresh halaman untuk melihat data terbaru")
+                        else:
+                            st.warning("⚠️ Tidak ada data unik untuk ditambahkan.")
 
                 else:  # Replace mode
                     st.warning(f"""
