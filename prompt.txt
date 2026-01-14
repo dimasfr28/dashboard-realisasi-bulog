@@ -1,0 +1,78 @@
+Saya ingin memperbarui skema migrasi data tanpa mengubah page dashboard realisasi sama sekali.
+
+Perubahan hanya berlaku pada modul:
+
+Target Kancab
+
+Target Kanwil
+termasuk seluruh dependensinya, yaitu:
+
+Target Kancab Compare
+
+Target Kanwil Compare
+
+Penambahan Kolom
+
+Akan ditambahkan kolom input baru bernama Tanggal Target dengan format bulan/tanggal/tahun (MM/DD/YYYY), contoh: 1/30/2025.
+
+Aturan Transformasi Tanggal (Wajib)
+
+Pada proses migrasi data:
+
+Nilai Tanggal Target harus disimpan ke kolom date pada tabel:
+
+target_kancab
+
+target_kanwil
+
+target_kancab_compare
+
+target_kanwil_compare
+
+Berapa pun nilai tanggal harinya (misalnya 2/28/2025, 3/15/2025, dll), tanggal harus dinormalisasi menjadi hari pertama pada bulan yang sama, sehingga:
+
+1/30/2025 → 1/1/2025
+
+2/28/2025 → 2/1/2025
+
+3/15/2025 → 3/1/2025
+
+Aturan normalisasi tanggal ini wajib diterapkan secara konsisten pada seluruh tabel target dan tabel compare.
+
+Aturan Migrasi dengan Skema Append
+
+Pada mode append, data tidak langsung ditambahkan sebagai baris baru, tetapi harus dilakukan pencocokan data terlebih dahulu.
+
+Pencocokan dilakukan berdasarkan kombinasi kolom:
+
+Target Kancab & Target Kancab Compare
+→ date + kancab_id
+
+Target Kanwil & Target Kanwil Compare
+→ date + kanwil_id
+
+Jika ditemukan data dengan kombinasi kunci yang sama:
+
+Nilai target_setara_beras pada baris yang sudah ada harus diperbarui (UPDATE) dengan nilai terbaru.
+
+Jika tidak ditemukan kecocokan:
+
+Data baru boleh ditambahkan (INSERT).
+
+Aturan Migrasi dengan Skema Replace
+
+Pada mode replace, mekanisme tetap sama seperti sebelumnya, yaitu:
+
+Menghapus seluruh data yang relevan pada tabel tujuan
+
+Menggantinya sepenuhnya dengan data hasil migrasi terbaru
+
+Skema replace tidak mengalami perubahan logika selain penerapan kolom dan normalisasi tanggal yang baru.
+
+Catatan Penting
+
+Tidak ada perubahan struktur maupun logika pada tabel realisasi dan realisasi_compare
+
+Tidak ada perubahan pada page dashboard realisasi
+
+Seluruh perubahan hanya berdampak pada modul Target Kancab, Target Kanwil, dan fitur Compare
