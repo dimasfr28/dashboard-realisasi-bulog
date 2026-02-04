@@ -2410,8 +2410,8 @@ def create_summary_table_from_rpc(p_akun_analitik, p_start_date, p_end_date):
                 'Capaian (%)': 0
             })
 
-    # Sort by Capaian (%) descending
-    data_sentra = sorted(data_sentra, key=lambda x: x['Capaian (%)'], reverse=True)
+    # Sort by Capaian (%) descending (handle None values)
+    data_sentra = sorted(data_sentra, key=lambda x: x['Capaian (%)'] if x['Capaian (%)'] is not None else 0, reverse=True)
     # Re-assign No after sorting
     for idx, row in enumerate(data_sentra, 1):
         row['No'] = idx
@@ -2446,8 +2446,8 @@ def create_summary_table_from_rpc(p_akun_analitik, p_start_date, p_end_date):
                 'Capaian (%)': 0
             })
 
-    # Sort by Capaian (%) descending
-    data_lainnya = sorted(data_lainnya, key=lambda x: x['Capaian (%)'], reverse=True)
+    # Sort by Capaian (%) descending (handle None values)
+    data_lainnya = sorted(data_lainnya, key=lambda x: x['Capaian (%)'] if x['Capaian (%)'] is not None else 0, reverse=True)
     # Re-assign No after sorting
     for idx, row in enumerate(data_lainnya, 1):
         row['No'] = idx
